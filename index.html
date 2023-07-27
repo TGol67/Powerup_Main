@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+</head>
+
+<body>
+    <script src="https://p.trellocdn.com/power-up.min.js"></script>
+    <script>
+        
+        var GRAY_ICON = 'https://cdn.hyperdev.com/us-east-1%3A3d31b21c-01a0-4da2-8827-4bc6e88b7618%2Ficon-gray.svg';
+        var API_SECRET = 'REPLACEME';
+
+        // Global variables  
+        var messageDuration = 5; // Adjust the duration to control how long the message is displayed
+        var lessonStatusURL;
+
+        function getLoggedInUserName(t) {
+            return t.member('fullName')
+                .then(function (member) {
+                    return member.fullName;
+                })
+                .catch(function (error) {
+                    console.error('Error fetching member data:', error);
+                });
+        }
+
+        function extractRespondioUrlFromCardDesc(desc, search_pattern = "Respondio (as lead): ") {
+            var url_index = desc.indexOf(search_pattern);
+            if (url_index < 0) {
+                url_index = desc.indexOf("Respondio (as lead): ");
+            }
+            if (url_index > 0) {
+                url_index = desc.indexOf("https://app.respond.io", url_index);
+                var url = desc.substring(url_index);
+                var url_index_end = url.indexOf("](https://app.respond.io");
+                var url_index_end_2 = url.indexOf("\r");
+                var url_index_end_3 = url.indexOf("\n");
+                if (url_index_end < 0 || url_index_end_2 > 0 && url_index_end_2 < url_index_end) {
+                    url_index_end = url_index_end_2;
+                }
+                if (url_index_end < 0 || url_index_end_3 > 0 && url_index_end_3 < url_index_end) {
+                    url_index_end = url_index_end_3;
+                }
+                url = url.substring(0, url_index_end);
+                return url;
+            }
+            return null;
+        }
+
+        function extractStudentRespondioUrlFromCardDesc(desc) {
+            return extractRespondioUrlFromCardDesc(desc, "Student's Respondio: ")
+        }  
+
+        TrelloPowerUp.initialize({
+            'card-buttons': function (t, options) { // Card buttons              
+                return [
+                    {
+                        icon: "https://cdn.hyperdev.com/us-east-1%3A3d31b21c-01a0-4da2-8827-4bc6e88b7618%2Ficon-gray.svg", // Set trial lesson button
+                        text: "Set Trial Lesson",
+                        callback: function (t) {
+                            var mentorName = window.prompt("Enter Mentor Name:");
+                            if (mentorName !== null) {
+                                var topic = window.prompt("Enter Topic/s to focus (leave blank if nothing special):");
+
+                                // Get the logged-in user's name using the separate function
+                                getLoggedInUserName(t).then(function (loggedInUserName) {
+                                    console.log("Logged-in user's name:", loggedInUserName);
+
+                                    // Get the card URL
+                                    t.card('url').then(function (card) {
+                                        var setTrialLessonURL = `https://gameready.co.il/wp-content/themes/generatepress/custom_php/trello/api.php?api_secret=${API_SECRET}&action=set_trial_lesson&card_url=${encodeURIComponent(card.url)}&mentor_name=${encodeURIComponent(mentorName)}&topic=${encodeURIComponent(topic)}`;
+
+                                        // Make a GET request to the API endpoint
+                                        fetch(setTrialLessonURL, {
+                                            method: 'GET'
+                                        })
+                                            .then(function (response) {
+                                                if (response.ok) {
+                                                    return response.json();
+                                                } else {
+                                                    throw new Error('Failed to create trial lesson. Please try again.');
+                                                }
+                                            })
+                                            .then(function (data) {
+                                                if (data.status === 'success') {
+                                                    return t.card('url').then(function (card) {
+                                                        lessonStatusURL = `https://gameready.co.il/wp-content/themes/generatepress/custom_php/trello/api.php?api_secret=${API_SECRET}&action=get_lesson_status&card_url=${encodeURIComponent(card.url)}`;
+                                                        var message = data.message ? data.message : null;
+                                                        alert((message ? message : 'Get the link from the iframe!') + ". Warning: you need to manually reload the Lesson Status iframe currently, until Tomer fixes an issue with refreshing it.");
+                                                    });
+                                                } else if (data.status === 'error') {
+                                                    throw { success: false, message: data.message };
+                                                }
+                                            })
+                                            .catch(function (UserMessage) {
+                                                var displayType = UserMessage.success ? 'success' : 'error';
+                                                var successMessage = UserMessage.success ? '✓ ' + UserMessage.message : UserMessage.message;
+                                                var errorMessage = UserMessage.success ? UserMessage.message : '✗ ' + UserMessage.message;
+
+                                                t.alert({
+                                                    message: UserMessage.success ? successMessage : errorMessage,
+                                                    display: displayType,
+                                                    duration: messageDuration
+                                                });
+                                            });
+                                    });
+                                });
+                            }
+                        }
+                    },
+                    {
+                        icon: "https://cdn.hyperdev.com/us-east-1%3A3d31b21c-01a0-4da2-8827-4bc6e88b7618%2Ficon-gray.svg", // Iframe Websites
+                        text: "Iframe Websites",
+                        callback: function (t) {
+                            return t.popup({
+                                title: "Menu",
+                                items: [
+                                    {
+                                        text: "Respond.io",
+                                        callback: function (t) {
+                                            return t.popup({
+                                                title: "Respond.io",
+                                                items: [
+                                                    {
+                                                        text: "Update Iframe",
+                                                        callback: function (t, opts) {
+                                                            if (respondLink) {
+                                                                t.set('card', 'shared', 'webSectionContentUrl', respondLink)
+                                                                    .then(function () {
+                                                                        t.get('board', 'private', 'cardBackRefreshed', false)
+                                                                            .then(function (cardBackRefreshed) {
+                                                                                t.set('board', 'private', 'cardBackRefreshed', !cardBackRefreshed)
+                                                                                    .then(function () {
+                                                                                        t.refresh();
+                                                                                        t.closePopup();
+                                                                                    });
+                                                                            });
+                                                                    });
+                                                            }
+                                                            else {                                                            
+                                                                t.alert({
+                                                                    message: '✗ The link is invalid.',
+                                                                    display: 'error',
+                                                                    duration: messageDuration
+                                                                });
+                                                            }
+                                                        }
+                                                    },
+                                                    {
+                                                        text: "Set URL",
+                                                        callback: function (t, opts) {
+                                                            respondLink = window.prompt("Enter the new URL for the Respond.io:");
+                                                            t.closePopup();
+                                                        }
+                                                    },
+                                                    {
+                                                        text: "Cancel",
+                                                        callback: function (t) {
+                                                            return t.closePopup();
+                                                        }
+                                                    }
+                                                ]
+                                            });
+                                        }
+                                    }                                 
+                                ]
+                            });
+                        }
+                    }
+                ];
+            },
+            'card-back-section': function (t, options) {
+
+                var currentCard;
+                var iframeHeight;
+                var iframeWidth;
+                var iframeDisplayed = false;
+
+                return t.card('id', 'desc').then(function (card) {
+                    currentCard = card;
+                    return extractStudentRespondioUrlFromCardDesc(card.desc);
+                }).then(function (respondio_url) {
+                    return t.get('card', 'shared', 'webSectionContentUrl').then(function (webSectionContentUrl) {
+                        if (!webSectionContentUrl) {
+                            webSectionContentUrl = respondio_url ? respondio_url : "http://example.com";
+                        }
+
+                        return t.get('card', 'shared', 'iframeHeight').then(function (height) {
+                            iframeHeight = height || 600; // Default iframe height
+
+                            return t.get('card', 'shared', 'iframeWidth').then(function (width) {
+                                iframeWidth = width || '600px'; // Default iframe width
+
+                                var iframeOptions = {
+                                    type: 'iframe',
+                                    url: webSectionContentUrl,
+                                    height: iframeHeight,
+                                    width: iframeWidth,
+                                    style: 'display: none' // Initially hide the iframe
+                                };
+
+                                var content = {
+                                    title: 'Student Respond.io:',
+                                    icon: GRAY_ICON,
+                                    content: iframeOptions,
+                                    'action': {
+                                        'text': 'Actions',
+                                        'callback': function (t) {
+                                            var setUrlCallback = function (t) {
+                                                var newUrl = window.prompt('Enter URL:');
+                                                if (newUrl) {
+                                                    t.set('card', 'shared', 'webSectionContentUrl', newUrl);
+                                                }
+                                                return t.closePopup();
+                                            };
+
+                                            var showUrlCallback = function (t) {
+                                                var currentUrl = webSectionContentUrl;
+                                                window.prompt('Iframe URL:', currentUrl); // Display the URL
+                                                return t.closePopup();
+                                            };
+
+                                            var setHeightCallback = function (t) {
+                                                var newHeight = window.prompt('Enter iframe height (100 - 1500):');
+                                                if (newHeight) {
+                                                    var parsedHeight = parseInt(newHeight);
+                                                    if (parsedHeight >= 100 && parsedHeight <= 1500) {
+                                                        iframeHeight = parsedHeight; // Update the iframe height
+                                                        t.set('card', 'shared', 'iframeHeight', iframeHeight)
+                                                            .then(function () {
+                                                                return t.showCard(currentCard.id); // Reload the card to reflect the new iframe height
+                                                            });
+                                                    } else {
+                                                        window.alert('Please enter a valid height between 100 and 1500.');
+                                                    }
+                                                }
+                                            };
+
+                                            var setWidthCallback = function (t) {
+                                                var newWidth = window.prompt('Enter iframe width (100 - 1500):');
+                                                if (newWidth) {
+                                                    var parsedWidth = parseInt(newWidth);
+                                                    if (parsedWidth >= 100 && parsedWidth <= 1500) {
+                                                        var message = {
+                                                            action: "modifyIframeWidth",
+                                                            width: `${parsedWidth}px`
+                                                        };
+                                                        window.top.postMessage(message, "*");
+                                                    } else {
+                                                        window.alert('Please enter a valid width between 100 and 1500.');
+                                                    }
+                                                }
+                                                return t.closePopup();
+                                            };
+
+                                            t.popup({
+                                                'title': 'Menu',
+                                                'items': [
+                                                    {
+                                                        'text': 'Set URL',
+                                                        'callback': setUrlCallback
+                                                    },
+                                                    {
+                                                        'text': 'Get URL',
+                                                        'callback': showUrlCallback
+                                                    },
+                                                    {
+                                                        'text': 'Set Iframe Height',
+                                                        'callback': setHeightCallback
+                                                    },
+                                                    {
+                                                        'text': 'Set Iframe Width',
+                                                        'callback': setWidthCallback
+                                                    }
+                                                ]
+                                            });
+                                            
+                                        }
+                                    }
+                                };
+
+                                return content;
+                            });
+                        });
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
