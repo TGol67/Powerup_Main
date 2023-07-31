@@ -10,7 +10,7 @@
     <script>
         
         var GRAY_ICON = 'https://cdn.hyperdev.com/us-east-1%3A3d31b21c-01a0-4da2-8827-4bc6e88b7618%2Ficon-gray.svg';
-        var API_SECRET = 'REPLACEME';
+        var API_SECRET = '<?=$gr_api_secret?>';
 
         // Global variables  
         var messageDuration = 5; // Adjust the duration to control how long the message is displayed
@@ -44,13 +44,14 @@
                     url_index_end = url_index_end_3;
                 }
                 url = url.substring(0, url_index_end);
+                console.log("Respondio url - " + search_pattern + ", url:" + url);
                 return url;
             }
             return null;
         }
 
         function extractStudentRespondioUrlFromCardDesc(desc) {
-            return extractRespondioUrlFromCardDesc(desc, "Student's Respondio: ")
+            return extractRespondioUrlFromCardDesc(desc, "Student's Respondio:");
         }  
 
         TrelloPowerUp.initialize({
@@ -76,35 +77,35 @@
                                         fetch(setTrialLessonURL, {
                                             method: 'GET'
                                         })
-                                            .then(function (response) {
-                                                if (response.ok) {
-                                                    return response.json();
-                                                } else {
-                                                    throw new Error('Failed to create trial lesson. Please try again.');
-                                                }
-                                            })
-                                            .then(function (data) {
-                                                if (data.status === 'success') {
-                                                    return t.card('url').then(function (card) {
-                                                        lessonStatusURL = `https://gameready.co.il/wp-content/themes/generatepress/custom_php/trello/api.php?api_secret=${API_SECRET}&action=get_lesson_status&card_url=${encodeURIComponent(card.url)}`;
-                                                        var message = data.message ? data.message : null;
-                                                        alert((message ? message : 'Get the link from the iframe!') + ". Warning: you need to manually reload the Lesson Status iframe currently, until Tomer fixes an issue with refreshing it.");
-                                                    });
-                                                } else if (data.status === 'error') {
-                                                    throw { success: false, message: data.message };
-                                                }
-                                            })
-                                            .catch(function (UserMessage) {
-                                                var displayType = UserMessage.success ? 'success' : 'error';
-                                                var successMessage = UserMessage.success ? '✓ ' + UserMessage.message : UserMessage.message;
-                                                var errorMessage = UserMessage.success ? UserMessage.message : '✗ ' + UserMessage.message;
-
-                                                t.alert({
-                                                    message: UserMessage.success ? successMessage : errorMessage,
-                                                    display: displayType,
-                                                    duration: messageDuration
+                                        .then(function (response) {
+                                            if (response.ok) {
+                                                return response.json();
+                                            } else {
+                                                throw new Error('Failed to create trial lesson. Please try again.');
+                                            }
+                                        })
+                                        .then(function (data) {
+                                            if (data.status === 'success') {
+                                                return t.card('url').then(function (card) {
+                                                    lessonStatusURL = `https://gameready.co.il/wp-content/themes/generatepress/custom_php/trello/api.php?api_secret=${API_SECRET}&action=get_lesson_status&card_url=${encodeURIComponent(card.url)}`;
+                                                    var message = data.message ? data.message : null;
+                                                    alert((message ? message : 'Get the link from the iframe!') + ". Warning: you need to manually reload the Lesson Status iframe currently, until Tomer fixes an issue with refreshing it.");
                                                 });
+                                            } else if (data.status === 'error') {
+                                                throw { success: false, message: data.message };
+                                            }
+                                        })
+                                        .catch(function (UserMessage) {
+                                            var displayType = UserMessage.success ? 'success' : 'error';
+                                            var successMessage = UserMessage.success ? '✓ ' + UserMessage.message : UserMessage.message;
+                                            var errorMessage = UserMessage.success ? UserMessage.message : '✗ ' + UserMessage.message;
+
+                                            t.alert({
+                                                message: UserMessage.success ? successMessage : errorMessage,
+                                                display: displayType,
+                                                duration: messageDuration
                                             });
+                                        });
                                     });
                                 });
                             }
